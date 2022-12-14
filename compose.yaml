@@ -1,0 +1,50 @@
+services:
+  dev:
+    image: node:18.12.1-bullseye-slim
+    container_name: k6sb-container-dev
+    networks:
+      - default
+    volumes:
+      - .:/app:cached
+    working_dir: /app
+    init: true
+    tty: true
+
+  prd:
+    image: gcr.io/distroless/nodejs:18
+    container_name: k6sb-container-prod
+    networks:
+      - default
+    ports:
+      - 3001:3000
+    volumes:
+      - ./dist:/app:ro
+    init: true
+    working_dir: /app
+    entrypoint: ['/nodejs/bin/node']
+    command: ['./main.js']
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+  k6:
+    image: grafana/k6:latest
+    container_name: k6sb-container-k6
+    depends_on:
+      prd:
+        condition: 'service_started'
+    environment:
+      LANG: C.UTF-8
+      TZ: UTC
+      TARGET_URL: http://prd:3000/
+    networks:
+      - default
+    volumes:
+      - ./k6:/app/k6:cached
+    working_dir: /app/k6
+
+networks:
+  default:
+    name: k6sb-network-default
